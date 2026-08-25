@@ -1,36 +1,22 @@
-# ✅ Base image: Best stable Python version
-FROM python:3.10.13-slim
+FROM python:3.11-slim
 
-# ✅ Set working directory
-WORKDIR /app
-
-# ✅ Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    ffmpeg \
-    aria2 \
-    libffi-dev \
-    build-essential \
-    python3-dev \
-    && apt-get clean \
+# System deps required by weasyprint (PDF generation) and PyMuPDF.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libcairo2 \
+    libffi-dev shared-mime-info fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
-# ✅ Copy all source code to container
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY . .
 
-# ✅ Make mp4decrypt executable (if present)
-RUN chmod +x /app/tools/mp4decrypt || true
+RUN mkdir -p /app/data
 
-# ✅ Upgrade pip and install Python packages
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r ugbots.txt \
-    && pip install --no-cache-dir -U yt-dlp
+# Mini App server port (only listens if MINI_APP_DOMAIN is configured / the
+# miniapp component is actually started -- harmless to expose otherwise).
+EXPOSE 8080
 
-# ✅ Remove pyrofork if accidentally included
-RUN pip uninstall -y pyrofork || true
-
-# ✅ Explicitly install stable Pyrogram + TgCrypto
-RUN pip install --no-cache-dir -U pyrogram==2.0.106 tgcrypto==1.2.5
-
-# ✅ Final command: start Flask + Bot together
-CMD ["sh", "-c", "gunicorn app:app & python3 main.py"]
+CMD ["python", "run.py"]
